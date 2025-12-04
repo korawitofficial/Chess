@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Book Maker - Infinite AI Analysis (Fixed)</title>
+
+    <!-- Libraries -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&family=Roboto+Mono:wght@400;600&display=swap');
+
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #262421;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #211f1c;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 3px;
+        }
+
+        input[type=range].vertical {
+            -webkit-appearance: none;
+            width: 8px;
+            height: 100%;
+            background: #403d39;
+            border-radius: 4px;
+            outline: none;
+            writing-mode: bt-lr;
+            -webkit-appearance: slider-vertical;
+            cursor: pointer;
+        }
+
+        input[type=range].vertical::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            border: 2px solid #aaa;
+            cursor: pointer;
+        }
+
+        /* Variation Styling */
+        .var-block {
+            margin-left: 0px;
+            background: #2a2825;
+            padding: 4px 8px;
+            margin-bottom: 2px;
+            border-left: 3px solid #504c47;
+            font-size: 0.85rem;
+            color: #aaa;
+            font-family: 'Roboto Mono', monospace;
+            white-space: normal;
+            line-height: 1.4;
+        }
+
+        .var-text {
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .var-text:hover {
+            color: #fff;
+            text-decoration: underline;
+        }
+
+        .main-row {
+            display: flex;
+            border-bottom: 1px solid #302e2b;
+        }
+
+        .main-cell {
+            flex: 1;
+            padding: 6px 8px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+
+        .main-cell:hover {
+            background-color: #302e2b;
+        }
+
+        .main-num {
+            width: 40px;
+            text-align: center;
+            color: #666;
+            background: #211f1c;
+            padding: 6px 0;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .active-move {
+            background-color: #b58863 !important;
+            color: white;
+            font-weight: bold;
+        }
+
+        /* AI Tab */
+        .ai-line {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.8rem;
+            padding: 8px;
+            border-bottom: 1px solid #302e2b;
+        }
+
+        .ai-score {
+            font-weight: bold;
+            width: 50px;
+            display: inline-block;
+            text-align: right;
+            margin-right: 10px;
+        }
+
+        .score-pos {
+            color: #81b64c;
+        }
+
+        .score-neg {
+            color: #ff6b6b;
+        }
+
+        .score-draw {
+            color: #aaa;
+        }
+
+        /* Console Log */
+        .console-log {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.7rem;
+            color: #aaa;
+            padding: 2px 4px;
+            border-bottom: 1px solid #302e2b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .log-in {
+            color: #81b64c;
+        }
+
+        /* Green for input to engine */
+        .log-out {
+            color: #aaa;
+        }
+
+        /* Gray for output */
+        .log-err {
+            color: #ff6b6b;
+        }
+
+        /* Red for error */
+        .log-sys {
+            color: #63b3ed;
+            font-weight: bold;
+        }
+
+        /* Blue for system */
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+        // --- STOCKFISH URL ---
+        const STOCKFISH_URL = "https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.0/stockfish.js";
+
+        // --- Icons ---
+        const Icon = ({ path, size = 20, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{path}</svg>
+        );
+        const Icons = {
+            FileText: (p) => <Icon {...p} path={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" /></>} />,
+            RotateCcw: (p) => <Icon {...p} path={<><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></>} />,
+            ChevronLeft: (p) => <Icon {...p} path={<polyline points="15 18 9 12 15 6" />} />,
+            ChevronRight: (p) => <Icon {...p} path={<polyline points="9 18 15 12 9 6" />} />,
+            ChevronsLeft: (p) => <Icon {...p} path={<><polyline points="11 17 6 12 11 7" /><polyline points="18 17 13 12 18 7" /></>} />,
+            ChevronsRight: (p) => <Icon {...p} path={<><polyline points="13 17 18 12 13 7" /><polyline points="6 17 11 12 6 7" /></>} />,
+            Download: (p) => <Icon {...p} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>} />,
+            Share: (p) => <Icon {...p} path={<><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" /></>} />,
+            Trash: (p) => <Icon {...p} path={<><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></>} />,
+            MessageSquare: (p) => <Icon {...p} path={<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></>} />,
+            Activity: (p) => <Icon {...p} path={<><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></>} />,
+            Save: (p) => <Icon {...p} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></>} />,
+            Folder: (p) => <Icon {...p} path={<><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></>} />,
+            Scissors: (p) => <Icon {...p} path={<><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><line x1="20" y1="4" x2="8.12" y2="15.88" /><line x1="14.47" y1="14.48" x2="20" y2="20" /><line x1="8.12" y1="8.12" x2="12" y2="12" /></>} />,
+            Eye: (p) => <Icon {...p} path={<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>} />,
+            EyeOff: (p) => <Icon {...p} path={<><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></>} />,
+            Cpu: (p) => <Icon {...p} path={<><rect x="4" y="4" width="16" height="16" rx="2" ry="2" /><rect x="9" y="9" width="6" height="6" /><line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" /><line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" /><line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" /><line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" /></>} />,
+            Terminal: (p) => <Icon {...p} path={<><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></>} />,
+            Infinity: (p) => <Icon {...p} path={<><path d="M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 1 0 0-8c-2 0-4 1.33-6 4Z" /></>} />
+        };
+        const { FileText, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Share, Trash, MessageSquare, Activity, Save, Folder, Scissors, Eye, EyeOff, Cpu, Terminal, Infinity: IconInfinity } = Icons;
+
+        const PIECE_IMAGES = {
+            'w': { 'p': 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg', 'n': 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg', 'b': 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg', 'r': 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg', 'q': 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg', 'k': 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg' },
+            'b': { 'p': 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg', 'n': 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg', 'b': 'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg', 'r': 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg', 'q': 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg', 'k': 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg' }
+        };
+
+        const loadPieceImages = async () => {
+            const images = { w: {}, b: {} };
+            const loadImage = (url) => new Promise((res, rej) => {
+                const img = new Image(); img.crossOrigin = "Anonymous"; img.src = url; img.onload = () => res(img); img.onerror = rej;
+            });
+            for (let c of ['w', 'b']) {
+                for (let p of ['p', 'n', 'b', 'r', 'q', 'k']) {
+                    try {
+                        const img = await loadImage(PIECE_IMAGES[c][p]);
+                        const cvs = document.createElement('canvas'); cvs.width = 128; cvs.height = 128;
+                        cvs.getContext('2d').drawImage(img, 0, 0, 128, 128);
+                        images[c][p] = cvs.toDataURL('image/png');
+                    } catch (e) { }
+                }
+            }
+            return images;
+        };
+
+        class MoveNode {
+            constructor(san, fen, parent = null, moveNumber = 1, turn = 'w') {
+                this.id = Math.random().toString(36).substr(2, 9);
+                this.san = san;
+                this.fen = fen;
+                this.parent = parent;
+                this.children = [];
+                this.moveNumber = moveNumber;
+                this.turn = turn;
+                this.comment = "";
+                this.eval = 0.0;
+            }
+        }
+
+        // --- Utils ---
+        const getBoardFromFen = (fen) => {
+            const board = [];
+            const rows = fen.split(' ')[0].split('/');
+            for (let row of rows) {
+                const r = [];
+                for (let char of row) {
+                    if (isNaN(char)) r.push(char); else for (let i = 0; i < parseInt(char); i++) r.push(null);
+                }
+                board.push(r);
+            }
+            return board;
+        };
+
+        const generateTreePGN = (node) => {
+            if (!node || node.san === 'Start') {
+                if (node && node.children.length > 0) return generateTreePGN(node.children[0]);
+                return "";
+            }
+            let text = "";
+            if (node.turn === 'w') text += `${node.moveNumber}. ${node.san} `;
+            else text += `${node.moveNumber}... ${node.san} `;
+            if (node.comment) text += `{ ${node.comment} } `;
+            if (node.children.length > 0) text += generateTreePGN(node.children[0]);
+            for (let i = 1; i < node.children.length; i++) text += `( ${generateTreePGN(node.children[i])} ) `;
+            return text;
+        };
+
+        const getFullVariationText = (startNode) => {
+            let text = ""; let temp = startNode; let first = true;
+            while (temp) {
+                if (temp.turn === 'w') text += `${temp.moveNumber}. ${temp.san} `;
+                else { if (first) text += `${temp.moveNumber}... ${temp.san} `; else text += `${temp.san} `; }
+                first = false;
+                if (temp.children.length > 0) temp = temp.children[0]; else temp = null;
+            }
+            return text;
+        };
+
+        const serializeNode = (node) => ({
+            san: node.san, fen: node.fen, moveNumber: node.moveNumber, turn: node.turn, comment: node.comment, eval: node.eval, children: node.children.map(serializeNode)
+        });
+        const deserializeNode = (data, parent = null) => {
+            const node = new MoveNode(data.san, data.fen, parent, data.moveNumber, data.turn);
+            node.comment = data.comment; node.eval = data.eval;
+            node.children = data.children.map(c => deserializeNode(c, node));
+            return node;
+        };
+
+        const App = () => {
+            const initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+            const rootNode = useMemo(() => new MoveNode('Start', initialFen, null, 0, 'b'), []);
+
+            const [currentNode, setCurrentNode] = useState(rootNode);
+            const [game, setGame] = useState(new Chess());
+            const [selectedSquare, setSelectedSquare] = useState(null);
+            const [possibleMoves, setPossibleMoves] = useState([]);
+            const [movablePieces, setMovablePieces] = useState([]);
+            const [orientation, setOrientation] = useState('white');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [notification, setNotification] = useState(null);
+            const [gameStatus, setGameStatus] = useState(null);
+            const [evalValue, setEvalValue] = useState(0.0);
+            const [commentValue, setCommentValue] = useState("");
+            const [savedCollections, setSavedCollections] = useState([]);
+            const [activeTab, setActiveTab] = useState('notation');
+            const [showHighlights, setShowHighlights] = useState(true);
+
+            // --- AI State ---
+            const [engine, setEngine] = useState(null);
+            const [isEngineReady, setIsEngineReady] = useState(false);
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [engineLines, setEngineLines] = useState([]);
+            const [engineSettings, setEngineSettings] = useState({
+                multiPV: 3,
+                depth: 18,
+                threads: 1,
+                infinite: true // Default to infinite
+            });
+            const [engineLogs, setEngineLogs] = useState([]);
+            const [showConsole, setShowConsole] = useState(false);
+            const [analysisTimerId, setAnalysisTimerId] = useState(null);
+
+            // Refs to expose latest values to worker callbacks
+            const engineRef = useRef(null);
+            const gameRef = useRef(null);
+            const currentNodeRef = useRef(null);
+            const analysisTimerIdRef = useRef(null);
+
+            // keep refs in sync whenever state changes
+            useEffect(() => { engineRef.current = engine; }, [engine]);
+            useEffect(() => { gameRef.current = game; }, [game]);
+            useEffect(() => { currentNodeRef.current = currentNode; }, [currentNode]);
+            useEffect(() => { analysisTimerIdRef.current = analysisTimerId; }, [analysisTimerId]);
+
+            const addLog = useCallback((msg, type = 'log-out') => {
+                setEngineLogs(prev => [`[${new Date().toLocaleTimeString().split(' ')[0]}] ${msg}`, ...prev.slice(0, 49)]);
+            }, []);
+
+            useEffect(() => {
+                const saved = localStorage.getItem('chess_book_collections');
+                if (saved) setSavedCollections(JSON.parse(saved));
+
+                const initEngine = async () => {
+                    addLog("Downloading Stockfish AI...", 'log-sys');
+                    try {
+                        const response = await fetch(STOCKFISH_URL);
+                        if (!response.ok) throw new Error("Failed to load Stockfish: " + response.status);
+                        addLog("Stockfish downloaded. Initializing...", 'log-sys');
+
+                        const script = await response.text();
+                        const blob = new Blob([script], { type: "application/javascript" });
+                        const worker = new Worker(URL.createObjectURL(blob));
+
+                        worker.onerror = (e) => {
+                            addLog(`Worker error: ${e.message}`, 'log-err');
+                            console.error("Worker error", e);
+                        };
+
+                        // worker onmessage uses refs (latest state)
+                        worker.onmessage = (e) => {
+                            const msg = (typeof e.data === 'string') ? e.data.trim() : JSON.stringify(e.data);
+                            addLog(msg, 'log-out');
+
+                            // bestmove -> apply immediately
+                            if (msg.startsWith('bestmove')) {
+                                const parts = msg.split(/\s+/);
+                                const best = parts[1];
+                                if (best && best !== '(none)' && best !== '0000') {
+                                    const from = best.substring(0,2);
+                                    const to = best.substring(2,4);
+                                    const promo = best.length > 4 ? best[4] : undefined;
+                                    const moveObj = { from, to };
+                                    if (promo) moveObj.promotion = promo;
+
+                                    try {
+                                        const g = new Chess(gameRef.current ? gameRef.current.fen() : currentNodeRef.current.fen);
+                                        const mv = g.move(moveObj);
+
+                                        if (mv) {
+                                            const parentNode = currentNodeRef.current;
+                                            // mv.color is the color that moved ('w' or 'b')
+                                            const moveNumber = parentNode.moveNumber + (mv.color === 'w' ? 1 : 0);
+                                            const newNode = new MoveNode(mv.san, g.fen(), parentNode, moveNumber, mv.color === 'w' ? 'w' : 'b');
+                                            parentNode.children.push(newNode);
+
+                                            // update react state
+                                            setGame(new Chess(g.fen()));
+                                            setCurrentNode(newNode);
+
+                                            addLog(`Applied engine bestmove: ${best} => ${mv.san}`, 'log-sys');
+
+                                            // stop any running analysis (optional)
+                                            if (analysisTimerIdRef.current) { clearTimeout(analysisTimerIdRef.current); analysisTimerIdRef.current = null; setAnalysisTimerId(null); }
+                                        } else {
+                                            addLog(`Engine move ${best} invalid`, 'log-err');
+                                        }
+                                    } catch (err) {
+                                        console.error("apply bestmove error", err);
+                                        addLog("Error applying bestmove: " + err.message, 'log-err');
+                                    }
+                                } else {
+                                    addLog("Engine returned no legal bestmove", 'log-sys');
+                                }
+                                return;
+                            }
+
+                            // parse info lines as before (update engineLines)
+                            if (msg.startsWith('info') && msg.includes(' pv ')) {
+                                const depthMatch = msg.match(/depth (\d+)/);
+                                const multipvMatch = msg.match(/multipv (\d+)/);
+                                const scoreCpMatch = msg.match(/score cp (-?\d+)/);
+                                const scoreMateMatch = msg.match(/score mate (-?\d+)/);
+                                const pvIndex = msg.indexOf(' pv ');
+                                if (pvIndex !== -1) {
+                                    const pv = msg.substring(pvIndex + 4).trim();
+                                    const multipv = multipvMatch ? parseInt(multipvMatch[1]) : 1;
+                                    let score = 0;
+                                    let mate = null;
+                                    if (scoreMateMatch) {
+                                        mate = parseInt(scoreMateMatch[1]);
+                                        score = mate > 0 ? 100 : -100;
+                                    } else if (scoreCpMatch) {
+                                        score = parseInt(scoreCpMatch[1]) / 100;
+                                    }
+
+                                    const sideToMove = (gameRef.current ? gameRef.current.turn() : new Chess(currentNodeRef.current.fen).turn());
+                                    let displayScore = score;
+                                    if (sideToMove === 'b' && !scoreMateMatch) displayScore = -score;
+                                    if (scoreMateMatch && sideToMove === 'b') displayScore = -mate;
+
+                                    setEngineLines(prev => {
+                                        const copy = [...prev];
+                                        copy[multipv - 1] = { depth: depthMatch ? parseInt(depthMatch[1]) : 0, score: displayScore, mate, pv, multipv };
+                                        return copy;
+                                    });
+                                }
+                            }
+
+                            if (msg.toLowerCase().includes('readyok')) {
+                                setIsEngineReady(true);
+                                addLog("Engine readyok", 'log-sys');
+                            }
+                            if (msg.toLowerCase().includes('uciok')) {
+                                worker.postMessage('isready');
+                            }
+                        };
+
+                        worker.postMessage('uci');
+                        addLog("> uci", 'log-in');
+
+                        setEngine(worker);
+
+                    } catch (e) {
+                        addLog("Error: " + e.message, 'log-err');
+                    }
+                };
+
+                initEngine();
+
+                return () => { if (engineRef.current) engineRef.current.terminate(); }
+            }, []);
+
+            useEffect(() => {
+                const newGame = new Chess(currentNode.fen);
+                setGame(newGame);
+                let status = null;
+                if (newGame.in_checkmate()) status = { type: 'checkmate', winner: newGame.turn() === 'w' ? 'Black' : 'White' };
+                else if (newGame.in_draw()) status = { type: 'draw' };
+                else if (newGame.in_check()) status = { type: 'check' };
+                setGameStatus(status);
+                setSelectedSquare(null);
+                setPossibleMoves([]);
+                setEvalValue(currentNode.eval || 0.0);
+                setCommentValue(currentNode.comment || "");
+
+                // Auto Analyze
+                if (isAnalyzing && engineRef.current && isEngineReady) {
+                    startAnalysis(currentNode.fen);
+                }
+            }, [currentNode]);
+
+            useEffect(() => {
+                if (showHighlights && game) {
+                    const moves = game.moves({ verbose: true });
+                    setMovablePieces([...new Set(moves.map(m => m.from))]);
+                } else setMovablePieces([]);
+            }, [game, showHighlights]);
+
+            const startAnalysis = (fen) => {
+                const eng = engineRef.current;
+                if (!eng) return addLog("No engine available", 'log-err');
+
+                // reset lines
+                setEngineLines([]);
+
+                eng.postMessage('stop');
+                eng.postMessage('setoption name MultiPV value ' + engineSettings.multiPV);
+                eng.postMessage('setoption name Threads value ' + engineSettings.threads);
+                eng.postMessage('position fen ' + fen);
+                addLog('> position fen ' + fen, 'log-in');
+
+                if (engineSettings.infinite) {
+                    eng.postMessage('go infinite');
+                    addLog('> go infinite', 'log-in');
+                    const t = setTimeout(() => {
+                        eng.postMessage('stop');
+                        addLog('> stop (timeout)', 'log-in');
+                        analysisTimerIdRef.current = null;
+                        setAnalysisTimerId(null);
+                    }, 1500); // ปรับเวลาได้
+                    analysisTimerIdRef.current = t;
+                    setAnalysisTimerId(t);
+                } else {
+                    eng.postMessage('go depth ' + engineSettings.depth);
+                    addLog('> go depth ' + engineSettings.depth, 'log-in');
+                }
+            };
+
+            const toggleAnalysis = () => {
+                if (isAnalyzing) {
+                    setIsAnalyzing(false);
+                    const eng = engineRef.current;
+                    if (eng) {
+                        eng.postMessage('stop');
+                        addLog("> stop", 'log-in');
+                    }
+                    if (analysisTimerIdRef.current) { clearTimeout(analysisTimerIdRef.current); analysisTimerIdRef.current = null; setAnalysisTimerId(null); }
+                } else {
+                    setIsAnalyzing(true);
+                    if (isEngineReady && engineRef.current) startAnalysis(currentNode.fen);
+                    else addLog("Engine not ready yet...", 'log-err');
+                }
+            };
+
+            const updateNodeData = (field, value) => {
+                currentNode[field] = value;
+                if (field === 'eval') setEvalValue(value);
+                if (field === 'comment') setCommentValue(value);
+            };
+
+            const showNotification = (msg) => { setNotification(msg); setTimeout(() => setNotification(null), 3000); };
+
+            const handleSquareClick = (row, col) => {
+                const r = orientation === 'white' ? row : 7 - row;
+                const c = orientation === 'white' ? col : 7 - col;
+                const sq = String.fromCharCode(97 + c) + (8 - r);
+                if (selectedSquare === sq) { setSelectedSquare(null); setPossibleMoves([]); return; }
+                if (selectedSquare) {
+                    try {
+                        const tmp = new Chess(game.fen());
+                        const move = tmp.move({ from: selectedSquare, to: sq, promotion: 'q' });
+                        if (move) {
+                            const existing = currentNode.children.find(child => child.san === move.san);
+                            if (existing) setCurrentNode(existing);
+                            else {
+                                const num = game.turn() === 'w' ? currentNode.moveNumber + 1 : currentNode.moveNumber;
+                                const newNode = new MoveNode(move.san, tmp.fen(), currentNode, num, game.turn());
+                                currentNode.children.push(newNode);
+                                setCurrentNode(newNode);
+                            }
+                            new Audio(move.captured ? 'https://images.chesscomfiles.com/chess-themes/sounds/_common/capture.mp3' : 'https://images.chesscomfiles.com/chess-themes/sounds/_common/move-self.mp3').play().catch(() => { });
+                            return;
+                        }
+                    } catch (e) { }
+                }
+                const p = game.get(sq);
+                if (p && p.color === game.turn()) {
+                    setSelectedSquare(sq);
+                    if (showHighlights) setPossibleMoves(game.moves({ square: sq, verbose: true }).map(m => m.to));
+                } else { setSelectedSquare(null); setPossibleMoves([]); }
+            };
+
+            // Actions (Delete, Save, Load, PGN, PDF) same as before...
+            const deleteCurrentNode = () => { if (!currentNode.parent) return; if (confirm(`Delete ${currentNode.san}?`)) { const p = currentNode.parent; p.children = p.children.filter(c => c.id !== currentNode.id); setCurrentNode(p); } };
+            const saveCollection = () => { const name = prompt("Name:"); if (!name) return; const updated = [...savedCollections, { id: Date.now(), name, date: new Date().toLocaleDateString(), data: serializeNode(rootNode) }]; setSavedCollections(updated); localStorage.setItem('chess_book_collections', JSON.stringify(updated)); showNotification("Saved!"); };
+            const loadCollection = (col) => { if (confirm(`Load?`)) { const newRoot = deserializeNode(col.data); rootNode.children = newRoot.children; const fix = (n, p) => { n.parent = p; n.children.forEach(c => fix(c, n)); }; fix(rootNode, null); setCurrentNode(rootNode); } };
+            const deleteCollection = (id) => { if (confirm("Delete?")) { const updated = savedCollections.filter(c => c.id !== id); setSavedCollections(updated); localStorage.setItem('chess_book_collections', JSON.stringify(updated)); } };
+            const copyPGN = () => { navigator.clipboard.writeText(generateTreePGN(rootNode)).then(() => showNotification("PGN Copied")); };
+
+            const generatePDF = async () => {
+                setIsGenerating(true); showNotification("Generating PDF...");
+                const pdfImgs = await loadPieceImages();
+                const { jsPDF } = window.jspdf; const doc = new jsPDF();
+                doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text("Chess Game Record", 105, 15, { align: "center" });
+                const line = []; let t = rootNode;
+                while (t.children.length > 0) { t = t.children[0]; line.push(t); }
+                let x = 25, y = 25, col = 0, row = 0; const boxW = 58, boardS = 48, boxH = 66;
+                const drawBoard = (fen, label, node) => {
+                    const board = getBoardFromFen(fen); const px = x + (boxW - boardS) / 2;
+                    doc.setFontSize(10); doc.setTextColor(0); doc.text(label, px + boardS / 2, y + 4, { align: "center" });
+                    const by = y + 6; doc.setLineWidth(0.05); doc.setDrawColor(0); const sq = boardS / 8;
+                    for (let r = 0; r < 8; r++) {
+                        for (let c = 0; c < 8; c++) {
+                            if ((r + c) % 2 === 1) { doc.setFillColor(240); doc.rect(px + c * sq, by + r * sq, sq, sq, 'F'); }
+                            doc.rect(px + c * sq, by + r * sq, sq, sq);
+                            const p = board[r][c];
+                            if (p) { const im = pdfImgs[p === p.toUpperCase() ? 'w' : 'b'][p.toLowerCase()]; if (im) doc.addImage(im, 'PNG', px + c * sq + 0.5, by + r * sq + 0.5, sq - 1, sq - 1); }
+                        }
+                    }
+                    const barY = by + boardS + 1; doc.setDrawColor(150); doc.rect(px, barY, boardS, 2.5);
+                    const val = Math.max(-5, Math.min(5, node.eval)); const cw = px + (boardS / 2); const fw = (Math.abs(val) / 5) * (boardS / 2);
+                    doc.setFillColor(100); if (val > 0) doc.rect(cw, barY, fw, 2.5, 'F'); else doc.rect(cw - fw, barY, fw, 2.5, 'F');
+                    doc.setDrawColor(0); doc.line(cw, barY, cw, barY + 2.5);
+                    doc.setFontSize(8); doc.text(`${node.eval > 0 ? '+' : ''}${node.eval}`, px + boardS, barY + 6.5, { align: "right" });
+                    const comm = doc.splitTextToSize(node.comment || "", boardS - 10); doc.text(comm.length > 2 ? comm.slice(0, 2) : comm, px, barY + 6.5);
+                };
+                drawBoard(initialFen, "Start", rootNode); x += boxW; col++;
+                line.forEach((n, i) => { const lbl = n.turn === 'w' ? `${n.moveNumber}. ${n.san}` : `${n.moveNumber}... ${n.san}`; drawBoard(n.fen, lbl, n); x += boxW; col++; if (col >= 3) { col = 0; x = 25; y += boxH; row++; if (row >= 4 && i < line.length - 1) { doc.addPage(); y = 25; row = 0; } } });
+                doc.save("chess_book_pro.pdf"); setIsGenerating(false);
+            };
+
+            const renderBoard = () => {
+                const b = getBoardFromFen(currentNode.fen);
+                const sqs = [];
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const ar = orientation === 'white' ? r : 7 - r, ac = orientation === 'white' ? c : 7 - c;
+                        const s = String.fromCharCode(97 + ac) + (8 - ar); const isLight = (ar + ac) % 2 === 0; const p = b[ar][ac];
+                        const isSel = selectedSquare === s; const isPoss = possibleMoves.includes(s); const isMov = movablePieces.includes(s);
+                        sqs.push(<div key={`${r}-${c}`} onClick={() => handleSquareClick(ar, ac)} className={`w-full h-full flex justify-center items-center relative cursor-pointer ${isLight ? 'bg-[#ebecd0]' : 'bg-[#739552]'} ${isSel ? '!bg-[#f7f769]' : ''}`}>
+                            {ac === (orientation === 'white' ? 0 : 7) && <span className={`absolute top-0.5 left-0.5 text-[10px] font-bold ${isLight ? 'text-[#739552]' : 'text-[#ebecd0]'}`}>{8 - ar}</span>}
+                            {ar === (orientation === 'white' ? 7 : 0) && <span className={`absolute bottom-0 right-1 text-[10px] font-bold ${isLight ? 'text-[#739552]' : 'text-[#ebecd0]'}`}>{String.fromCharCode(97 + ac)}</span>}
+                            {isMov && !isSel && <div className="absolute w-full h-full border-[3px] border-blue-400/70 rounded-lg z-0"></div>}
+                            {isPoss && !p && <div className="w-[30%] h-[30%] rounded-full bg-[rgba(0,0,0,0.2)] z-10"></div>}
+                            {isPoss && p && <div className="absolute w-full h-full border-[6px] border-[rgba(0,0,0,0.2)] rounded-full z-10"></div>}
+                            {p && <img src={PIECE_IMAGES[p === p.toUpperCase() ? 'w' : 'b'][p.toLowerCase()]} className="w-[90%] h-[90%] z-10 relative select-none" />}
+                        </div>);
+                    }
+                } return sqs;
+            };
+
+            const activeLine = useMemo(() => {
+                const line = []; let temp = currentNode;
+                while (temp.parent) { line.unshift(temp); temp = temp.parent; }
+                let future = currentNode;
+                while (future.children.length > 0) { future = future.children[0]; line.push(future); }
+                const pairs = []; let i = 0;
+                while (i < line.length) {
+                    const node = line[i];
+                    const siblings = node.parent ? node.parent.children.filter(c => c.id !== node.id) : [];
+                    if (node.turn === 'w') {
+                        const pair = { num: node.moveNumber, white: node, whiteVars: siblings, black: null, blackVars: [] };
+                        if (i + 1 < line.length && line[i + 1].turn === 'b') {
+                            pair.black = line[i + 1];
+                            pair.blackVars = line[i + 1].parent.children.filter(c => c.id !== line[i + 1].id);
+                            i++;
+                        }
+                        pairs.push(pair);
+                    } else { pairs.push({ num: node.moveNumber, white: null, whiteVars: [], black: node, blackVars: siblings }); }
+                    i++;
+                }
+                return pairs;
+            }, [currentNode]);
+
+            return (
+                <div className="flex w-screen h-screen bg-[#262421]">
+                    <div className="w-[300px] bg-[#211f1c] border-r border-[#302e2b] flex flex-col p-4 gap-4 overflow-y-auto z-20 shadow-xl">
+                        <div className="flex items-center gap-2 text-green-500 font-bold text-xl mb-2"><span>♟ Chess Book AI</span></div>
+                        <div className="bg-[#302e2b] p-3 rounded-lg flex flex-col gap-2">
+                            <div className="flex justify-between gap-1">
+                                <button onClick={() => setCurrentNode(rootNode)} className="flex-1 p-2 bg-[#403d39] rounded"><ChevronsLeft size={18} /></button>
+                                <button onClick={() => { if (currentNode.parent) setCurrentNode(currentNode.parent) }} className="flex-1 p-2 bg-[#403d39] rounded"><ChevronLeft size={18} /></button>
+                                <button onClick={() => { if (currentNode.children.length) setCurrentNode(currentNode.children[0]) }} className="flex-1 p-2 bg-[#403d39] rounded"><ChevronRight size={18} /></button>
+                                <button onClick={() => { let t = currentNode; while (t.children.length) t = t.children[0]; setCurrentNode(t) }} className="flex-1 p-2 bg-[#403d39] rounded"><ChevronsRight size={18} /></button>
+                            </div>
+                            <div className="flex justify-between gap-1 mt-1">
+                                <button onClick={() => setOrientation(o => o === 'white' ? 'black' : 'white')} className="flex-1 p-2 bg-[#403d39] rounded"><RotateCcw size={18} /></button>
+                                <button onClick={() => setShowHighlights(!showHighlights)} className={`flex-1 p-2 rounded ${showHighlights ? 'bg-green-600/50 text-green-200' : 'bg-[#403d39] text-gray-400'}`}>{showHighlights ? <Eye size={18} /> : <EyeOff size={18} />}</button>
+                                <button onClick={deleteCurrentNode} className="flex-1 p-2 bg-[#403d39] text-red-400 rounded"><Scissors size={18} /></button>
+                                <button onClick={() => { if (confirm("Reset?")) setCurrentNode(rootNode) }} className="flex-1 p-2 bg-[#403d39] text-red-400 rounded"><Trash size={18} /></button>
+                            </div>
+                        </div>
+                        <div className="bg-[#302e2b] p-3 rounded-lg flex gap-3 h-[240px]">
+                            <div className="w-12 flex flex-col items-center gap-2 h-full">
+                                <span className="text-[10px] text-gray-400">EVAL</span>
+                                <input type="number" step="0.1" value={evalValue} onChange={(e) => updateNodeData('eval', parseFloat(e.target.value))} className="w-full bg-[#211f1c] text-center text-xs rounded border border-[#403d39] py-1" />
+                                <div className="flex-1 w-full flex justify-center py-1"><input type="range" min="-5" max="5" step="0.1" value={evalValue} onChange={(e) => updateNodeData('eval', parseFloat(e.target.value))} className="vertical" /></div>
+                                <span className={`text-xs font-mono font-bold ${evalValue > 0 ? 'text-green-400' : evalValue < 0 ? 'text-red-400' : 'text-gray-400'}`}>{evalValue > 0 ? '+' : ''}{evalValue}</span>
+                            </div>
+                            <div className="flex-1 flex flex-col gap-2">
+                                <div className="text-[10px] text-gray-400 flex items-center gap-1"><MessageSquare size={12} /> COMMENT</div>
+                                <textarea value={commentValue} onChange={(e) => updateNodeData('comment', e.target.value)} placeholder="Notes..." className="w-full h-full bg-[#211f1c] border border-[#403d39] rounded p-2 text-sm text-gray-200 resize-none outline-none focus:border-green-500" />
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={copyPGN} className="flex-1 py-2 bg-[#302e2b] rounded text-sm font-bold text-gray-300 flex justify-center gap-2"><Share size={16} /> PGN</button>
+                            <button onClick={generatePDF} className="flex-1 py-2 bg-green-600 rounded text-sm font-bold text-white flex justify-center gap-2 shadow"><Download size={16} /> PDF</button>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 flex justify-center items-center bg-[#302e2b] p-4 relative">
+                        {gameStatus && <div className="absolute top-4 px-6 py-2 rounded-full font-bold shadow-lg z-30 bg-gray-700 text-white border border-gray-500">{gameStatus.type === 'checkmate' ? `Winner: ${gameStatus.winner}` : gameStatus.type === 'check' ? 'Check!' : 'Draw'}</div>}
+                        <div className="w-full h-full max-w-[90vh] max-h-[90vh] aspect-square shadow-2xl border-[8px] border-[#211f1c] grid grid-cols-8 grid-rows-8">{renderBoard()}</div>
+                    </div>
+
+                    <div className="w-[300px] bg-[#211f1c] border-l border-[#302e2b] flex flex-col relative">
+                        <div className="flex border-b border-[#302e2b]">
+                            <button onClick={() => setActiveTab('notation')} className={`flex-1 p-3 text-xs font-bold ${activeTab === 'notation' ? 'text-green-500 border-b-2 border-green-500' : 'text-gray-400 hover:bg-[#302e2b]'}`}>Notation</button>
+                            <button onClick={() => setActiveTab('collections')} className={`flex-1 p-3 text-xs font-bold ${activeTab === 'collections' ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-400 hover:bg-[#302e2b]'}`}>Collections</button>
+                            <button onClick={() => setActiveTab('engine')} className={`flex-1 p-3 text-xs font-bold ${activeTab === 'engine' ? 'text-red-500 border-b-2 border-red-500' : 'text.GRAY-400 hover:bg-[#302e2b]'}`}>Engine</button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto">
+                            {activeTab === 'notation' && (
+                                <div>{activeLine.map((pair, i) => (
+                                    <div key={i}>
+                                        <div className="main-row">
+                                            <div className="main-num">{pair.num}.</div>
+                                            {pair.white ? <div className={`main-cell ${pair.white.id === currentNode.id ? 'active-move' : 'text-gray-300'}`} onClick={() => setCurrentNode(pair.white)}>{pair.white.san}</div> : <div className="main-cell text-gray-600">...</div>}
+                                            {pair.black ? <div className={`main-cell ${pair.black.id === currentNode.id ? 'active-move' : 'text-gray-300'}`} onClick={() => setCurrentNode(pair.black)}>{pair.black.san}</div> : <div className="main-cell"></div>}
+                                        </div>
+                                        {pair.whiteVars.map(v => <div key={v.id} className="var-block"><span className="var-text" onClick={() => setCurrentNode(v)}>({getFullVariationText(v)})</span></div>)}
+                                        {pair.blackVars.map(v => <div key={v.id} className="var-block"><span className="var-text" onClick={() => setCurrentNode(v)}>({getFullVariationText(v)})</span></div>)}
+                                    </div>
+                                ))}</div>
+                            )}
+
+                            {activeTab === 'collections' && (
+                                <div className="p-3 space-y-2">
+                                    {savedCollections.map(col => (
+                                        <div key={col.id} className="bg-[#302e2b] p-2 rounded border border-[#403d39] flex justify-between items-center">
+                                            <div><div className="text-xs font-bold text-gray-300">{col.name}</div><div className="text-[10px] text-gray-600">{col.date}</div></div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => loadCollection(col)} className="text-blue-400 hover:text-blue-300"><Folder size={14} /></button>
+                                                <button onClick={() => deleteCollection(col.id)} className="text-red-400 hover:text-red-300"><Trash size={14} /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {activeTab === 'engine' && (
+                                <div className="flex flex-col h-full">
+                                    <div className="bg-[#302e2b] p-3 border-b border-[#403d39]">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-bold flex items-center gap-2">
+                                                <Cpu size={14} /> {isEngineReady ? 'Stockfish Ready' : 'Loading Engine...'}
+                                            </span>
+                                            <button onClick={toggleAnalysis} className={`px-3 py-1 text-xs rounded font-bold ${isAnalyzing ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}>
+                                                {isAnalyzing ? 'STOP' : 'START'}
+                                            </button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-400 mb-2">
+                                            <div className="flex items-center gap-1">Lines: <input type="number" min="1" max="5" value={engineSettings.multiPV} onChange={(e) => setEngineSettings({ ...engineSettings, multiPV: parseInt(e.target.value) })} className="w-8 bg-[#211f1c] text-center border border-[#403d39] rounded" /></div>
+                                            {!engineSettings.infinite && <div className="flex items-center gap-1">Depth: <input type="number" min="10" max="30" value={engineSettings.depth} onChange={(e) => setEngineSettings({ ...engineSettings, depth: parseInt(e.target.value) })} className="w-8 bg-[#211f1c] text-center border border-[#403d39] rounded" /></div>}
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs text-gray-400 mb-2">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" checked={engineSettings.infinite} onChange={(e) => setEngineSettings({ ...engineSettings, infinite: e.target.checked })} className="form-checkbox h-3 w-3 text-green-600 bg-[#211f1c] border-[#403d39] rounded" />
+                                                <span className="flex items-center gap-1"><IconInfinity size={12} /> Infinite</span>
+                                            </label>
+                                            <button onClick={() => setShowConsole(!showConsole)} className="text-[10px] text-gray-500 hover:text-gray-300 flex items-center gap-1">
+                                                <Terminal size={10} /> Console
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto bg-[#211f1c]">
+                                        {engineLines.length === 0 && <div className="text-center text-xs text-gray-600 mt-4">{isAnalyzing ? 'Thinking...' : 'Press Start to analyze'}</div>}
+                                        {engineLines.map((line, idx) => line ? (
+                                            <div key={idx} className="ai-line">
+                                                <span className={`ai-score ${line.mate ? (line.mate > 0 ? 'score-pos' : 'score-neg') : (line.score > 0.5 ? 'score-pos' : line.score < -0.5 ? 'score-neg' : 'score-draw')}`}>
+                                                    {line.mate ? `#${line.mate}` : (line.score > 0 ? `+${line.score.toFixed(2)}` : line.score.toFixed(2))}
+                                                </span>
+                                                <span className="text-gray-400">D{line.depth} </span>
+                                                <span className="text-gray-300 break-words">{line.pv}</span>
+                                            </div>
+                                        ) : null)}
+                                    </div>
+
+                                    {/* System Log / Console Area */}
+                                    {showConsole && (
+                                        <div className="h-32 bg-[#1a1816] border-t border-[#403d39] overflow-y-auto p-2 font-mono text-[10px]">
+                                            {engineLogs.map((log, i) => (
+                                                <div key={i} className={`console-log ${log.includes('log-in') ? 'log-in' : log.includes('log-err') ? 'log-err' : log.includes('log-sys') ? 'log-sys' : 'log-out'}`}>
+                                                    {log}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
