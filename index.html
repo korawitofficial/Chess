@@ -2,8 +2,8 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chess Book Pro (Embedded AI)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chess Book Pro (Max Depth)</title>
     
     <!-- Libraries -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -17,9 +17,9 @@
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&family=Roboto+Mono:wght@400;600&display=swap');
         body { font-family: 'Sarabun', sans-serif; background-color: #262421; color: #fff; overflow: hidden; }
         
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: #211f1c; }
-        ::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 2px; }
         
         input[type=range].vertical {
             -webkit-appearance: none; width: 8px; height: 100%;
@@ -31,7 +31,6 @@
             background: #fff; border-radius: 50%; border: 2px solid #aaa; cursor: pointer;
         }
 
-        /* Variation Styling */
         .var-block { margin-left: 0px; background: #2a2825; padding: 4px 8px; margin-bottom: 2px; border-left: 3px solid #504c47; font-size: 0.85rem; color: #aaa; font-family: 'Roboto Mono', monospace; white-space: normal; line-height: 1.4; }
         .var-text { cursor: pointer; transition: color 0.2s; }
         .var-text:hover { color: #fff; text-decoration: underline; }
@@ -42,16 +41,18 @@
         .main-num { width: 40px; text-align: center; color: #666; background: #211f1c; padding: 6px 0; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; }
         .active-move { background-color: #b58863 !important; color: white; font-weight: bold; }
 
-        /* Toggle Switch */
         .toggle-checkbox:checked { right: 0; border-color: #68D391; }
         .toggle-checkbox:checked + .toggle-label { background-color: #68D391; }
         
-        /* Figurine Font Style */
         .figurine { font-family: 'Times New Roman', serif; font-size: 1.1em; margin-right: 1px; }
-
-        /* Animation for Modal */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .animate-fade-in { animation: fadeIn 0.2s ease-out; }
+        .spinner { border: 2px solid rgba(255,255,255,0.1); width: 16px; height: 16px; border-radius: 50%; border-left-color: #4ade80; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Mobile specific fixes */
+        .mobile-tab-active { color: #4ade80; border-bottom: 2px solid #4ade80; }
+        .mobile-tab-inactive { color: #9ca3af; }
     </style>
 </head>
 <body>
@@ -60,11 +61,9 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // --- Icons ---
         const Icon = ({ path, size = 20, className = "" }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{path}</svg>
         );
-        // Using a comprehensive icon set
         const Icons = {
             FileText: (p) => <Icon {...p} path={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></>} />,
             RotateCcw: (p) => <Icon {...p} path={<><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></>} />,
@@ -76,7 +75,6 @@
             Share: (p) => <Icon {...p} path={<><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></>} />,
             Trash: (p) => <Icon {...p} path={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>} />,
             MessageSquare: (p) => <Icon {...p} path={<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>} />,
-            Activity: (p) => <Icon {...p} path={<><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></>} />,
             Save: (p) => <Icon {...p} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />,
             Folder: (p) => <Icon {...p} path={<><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></>} />,
             Scissors: (p) => <Icon {...p} path={<><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></>} />,
@@ -88,12 +86,12 @@
             Navigation: (p) => <Icon {...p} path={<><polygon points="3 11 22 2 13 21 11 13 3 11"/></>} />,
             Keyboard: (p) => <Icon {...p} path={<><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><line x1="6" y1="8" x2="6" y2="8"></line><line x1="10" y1="8" x2="10" y2="8"></line><line x1="14" y1="8" x2="14" y2="8"></line><line x1="18" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="6" y2="12"></line><line x1="10" y1="12" x2="10" y2="12"></line><line x1="14" y1="12" x2="14" y2="12"></line><line x1="18" y1="12" x2="18" y2="12"></line><line x1="6" y1="16" x2="6" y2="16"></line><line x1="10" y1="16" x2="16" y2="16"></line></>} />,
             Close: (p) => <Icon {...p} path={<><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></>} />,
-            FileCode: (p) => <Icon {...p} path={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13v-1h6v1"/></>} />,
             Server: (p) => <Icon {...p} path={<><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></>} />,
             Globe: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></>} />,
-            Cpu: (p) => <Icon {...p} path={<><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></>} />
+            Cpu: (p) => <Icon {...p} path={<><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></>} />,
+            Wrench: (p) => <Icon {...p} path={<><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>} />
         };
-        const { FileText, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Share, Trash, MessageSquare, Activity, Save, Folder, Scissors, Eye, EyeOff, Upload, ExternalLink, Brain, ArrowRight, Navigation, Keyboard, Close, FileCode, Server, Globe, Cpu } = Icons;
+        const { FileText, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Share, Trash, MessageSquare, Save, Folder, Scissors, Eye, EyeOff, Upload, ExternalLink, Brain, Navigation, Keyboard, Close, Server, Globe, Cpu, Wrench } = Icons;
 
         const PIECE_IMAGES = {
             'w': { 'p': 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg', 'n': 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg', 'b': 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg', 'r': 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg', 'q': 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg', 'k': 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg' },
@@ -118,7 +116,6 @@
             return images;
         };
 
-        // --- HASH UTILS ---
         const computeSHA256 = async (str) => {
             const buf = new TextEncoder().encode(str);
             const hashBuf = await crypto.subtle.digest('SHA-256', buf);
@@ -140,6 +137,7 @@
                 this.comment = "";
                 this.eval = null; 
                 this.aiEval = null; 
+                this.aiDepth = 0; // Added to track depth confidence
             }
         }
 
@@ -153,7 +151,6 @@
             }
         }
 
-        // --- Chess Utils ---
         const toFigurine = (san) => {
             if (!san) return "";
             return san.replace(/K/g, "♔").replace(/Q/g, "♕").replace(/R/g, "♖").replace(/B/g, "♗").replace(/N/g, "♘");
@@ -186,7 +183,6 @@
                     const moveObj = tempGame.move({ from, to, promotion });
                     
                     if (moveObj) {
-                        // Fix logic to properly show move numbers in variation
                         const moveNum = Math.floor((tempGame.history().length - 1) / 2) + 1;
                         const prefix = moveObj.color === 'w' ? `${moveNum}.` : (i === 0 ? `${moveNum}...` : "");
                         formatted.push({ prefix: prefix, san: toFigurine(moveObj.san) });
@@ -236,17 +232,17 @@
 
         const serializeNode = (node) => ({
             san: node.san, fen: node.fen, moveNumber: node.moveNumber, turn: node.turn, 
-            comment: node.comment, eval: node.eval, aiEval: node.aiEval, 
+            comment: node.comment, eval: node.eval, aiEval: node.aiEval, aiDepth: node.aiDepth,
             children: node.children.map(serializeNode)
         });
         const deserializeNode = (data, parent = null) => {
             const node = new MoveNode(data.san, data.fen, parent, data.moveNumber, data.turn);
-            node.comment = data.comment; node.eval = data.eval; node.aiEval = data.aiEval;
+            node.comment = data.comment; node.eval = data.eval; node.aiEval = data.aiEval; 
+            node.aiDepth = data.aiDepth || 0;
             node.children = data.children.map(c => deserializeNode(c, node));
             return node;
         };
 
-        // --- AI Fetch Functions ---
         const fetchEvalFromLichess = async (fen) => {
             try {
                 const response = await fetch(`https://lichess.org/api/cloud-eval?fen=${encodeURIComponent(fen)}&multiPv=1`);
@@ -254,15 +250,12 @@
                     const data = await response.json();
                     if (data.pvs && data.pvs.length > 0) {
                         let val = 0;
-                        if (data.pvs[0].mate) {
-                            val = data.pvs[0].mate > 0 ? 100 : -100;
-                        } else {
-                            val = data.pvs[0].cp / 100;
-                        }
+                        if (data.pvs[0].mate) { val = data.pvs[0].mate > 0 ? 100 : -100; } 
+                        else { val = data.pvs[0].cp / 100; }
                         return { ...data, val: val, source: 'Lichess Cloud' };
                     }
                 }
-            } catch (e) { console.error("Lichess Fetch Error:", e); }
+            } catch (e) { }
             return null;
         };
 
@@ -288,13 +281,12 @@
             return meta;
         };
 
-        // --- AI Display Component ---
         const AiDisplayPanel = ({ title, icon: IconComp, enabled, onToggle, data, loading, error, children, color, subTitle }) => (
             <div className={`rounded-lg border mb-2 transition-all ${enabled ? `border-${color}-500/50 bg-[${color}-900]/10` : 'border-[#403d39] bg-[#302e2b]'}`}>
                 <div className="p-3 flex justify-between items-center bg-black/20 rounded-t-lg">
                     <div className="flex flex-col">
                         <span className={`text-sm font-bold flex items-center gap-2 ${enabled ? `text-${color}-400` : 'text-gray-400'}`}>
-                            <IconComp size={16}/> {title}
+                            {loading ? <div className="spinner"></div> : <IconComp size={16}/>} {title}
                         </span>
                         {subTitle && <span className="text-[10px] text-gray-500 ml-6">{subTitle}</span>}
                     </div>
@@ -303,13 +295,11 @@
                         <label className={`toggle-label block overflow-hidden h-4 rounded-full cursor-pointer ${enabled ? `bg-${color}-500` : 'bg-gray-600'}`}></label>
                     </div>
                 </div>
-                
                 {enabled && (
                     <div className="p-3 border-t border-white/5 space-y-3">
                         {children}
-                        
                         {loading ? (
-                            <div className="text-center py-4 text-xs text-gray-500 animate-pulse">กำลังวิเคราะห์...</div>
+                            <div className="text-center py-4 text-xs text-gray-500 animate-pulse">Analyzing...</div>
                         ) : error ? (
                             <div className="text-center py-2 text-xs text-red-400">{error}</div>
                         ) : data ? (
@@ -318,7 +308,7 @@
                                     <div className="bg-black/30 p-2 rounded flex-1 text-center">
                                         <div className="text-[9px] text-gray-500 uppercase">Score</div>
                                         <div className={`text-sm font-bold ${data.val > 0 ? 'text-green-400' : data.val < 0 ? 'text-red-400' : 'text-gray-300'}`}>
-                                            {data.pvs[0].mate ? `#${data.pvs[0].mate}` : (data.val).toFixed(2)}
+                                            {data.mate ? `#${data.mate}` : (data.val).toFixed(2)}
                                         </div>
                                     </div>
                                     <div className="bg-black/30 p-2 rounded flex-1 text-center">
@@ -364,8 +354,8 @@
             const [showShortcuts, setShowShortcuts] = useState(false);
             const [showCollections, setShowCollections] = useState(false);
             const [isGenerating, setIsGenerating] = useState(false);
-            const [pdfProgress, setPdfProgress] = useState(0);
-
+            const [mobileTab, setMobileTab] = useState('tools');
+            
             // AI States
             const [lichessEnabled, setLichessEnabled] = useState(false);
             const [stockfishEnabled, setStockfishEnabled] = useState(false);
@@ -373,13 +363,27 @@
             const [lichessData, setLichessData] = useState(null);
             const [stockfishData, setStockfishData] = useState(null);
             const [isLichessLoading, setIsLichessLoading] = useState(false);
+            const [aiDepth, setAiDepth] = useState(20); // Default Depth
             
             const lichessTimeoutRef = useRef(null);
             const lichessCache = useRef({});
-            
-            // Stockfish Worker Refs
             const stockfishWorker = useRef(null);
             const stockfishUrl = "https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.0/stockfish.js"; 
+
+            // --- HELPER: GET BEST DATA (MAX DEPTH PRIORITY) ---
+            const getBestEngineData = useCallback(() => {
+                const sfDepth = stockfishData?.depth || 0;
+                const liDepth = lichessData?.depth || 0;
+                
+                // Priority: Depth > 0
+                if (sfDepth === 0 && liDepth === 0) return null;
+                
+                // If Local is deeper or equal, trust local
+                if (sfDepth >= liDepth) return stockfishData;
+                
+                // Else trust cloud
+                return lichessData;
+            }, [stockfishData, lichessData]);
 
             useEffect(() => {
                 const saved = localStorage.getItem('chess_book_collections');
@@ -395,113 +399,70 @@
                 localStorage.setItem('chess_book_lichess_enabled', lichessEnabled);
             }, [stockfishEnabled, lichessEnabled]);
 
-            // --- LOCAL STOCKFISH LOGIC ---
+            // --- LOCAL STOCKFISH ---
             useEffect(() => {
                 if (stockfishEnabled && !stockfishWorker.current) {
-                    // Initialize Worker using Blob to avoid CORS when deploying
-                    fetch(stockfishUrl)
-                        .then(r => r.text())
-                        .then(code => {
-                            const blob = new Blob([code], { type: 'application/javascript' });
-                            const worker = new Worker(URL.createObjectURL(blob));
-                            
-                            worker.onmessage = (e) => {
-                                const line = e.data;
-                                if (line.startsWith('info') && line.includes('depth') && line.includes('score')) {
-                                    // Parse UCI
-                                    const depthMatch = line.match(/depth (\d+)/);
-                                    const scoreMatch = line.match(/score (cp|mate) ([-\d]+)/);
-                                    const pvMatch = line.match(/ pv (.+)/);
-                                    
-                                    if (depthMatch && scoreMatch && pvMatch) {
-                                        const depth = parseInt(depthMatch[1]);
-                                        const type = scoreMatch[1];
-                                        const rawScore = parseInt(scoreMatch[2]);
-                                        const pv = pvMatch[1];
-
-                                        // Only update if depth is decent or it's a mate
-                                        if (depth >= 10 || type === 'mate') {
-                                            const turnMultiplier = game.turn() === 'w' ? 1 : -1;
-                                            // CP from engine is usually from white's perspective or side-to-move depending on engine version
-                                            // Stockfish.js 10 is usually side-to-move. Let's assume side-to-move for now.
-                                            
-                                            let val = 0;
-                                            let mate = null;
-                                            
-                                            if (type === 'mate') {
-                                                mate = rawScore;
-                                                val = rawScore > 0 ? 100 : -100;
-                                            } else {
-                                                val = rawScore / 100;
-                                            }
-
-                                            // Process PV
-                                            const formattedPv = formatPvSequence(game.fen(), pv);
-                                            const bestMoveUci = pv.split(' ')[0];
-                                            const bestMoveSan = uciToSan(game.fen(), bestMoveUci);
-
-                                            setStockfishData({
-                                                val: val,
-                                                mate: mate,
-                                                depth: depth,
-                                                bestMoveSan: toFigurine(bestMoveSan),
-                                                bestMoveUci: bestMoveUci,
-                                                formattedPv: formattedPv,
-                                                pvs: [{ mate: mate }]
-                                            });
-                                        }
+                    fetch(stockfishUrl).then(r => r.text()).then(code => {
+                        const blob = new Blob([code], { type: 'application/javascript' });
+                        const worker = new Worker(URL.createObjectURL(blob));
+                        worker.onmessage = (e) => {
+                            const line = e.data;
+                            if (line.startsWith('info') && line.includes('depth') && line.includes('score')) {
+                                const depthMatch = line.match(/depth (\d+)/);
+                                const scoreMatch = line.match(/score (cp|mate) ([-\d]+)/);
+                                const pvMatch = line.match(/ pv (.+)/);
+                                if (depthMatch && scoreMatch && pvMatch) {
+                                    const depth = parseInt(depthMatch[1]);
+                                    const type = scoreMatch[1];
+                                    const rawScore = parseInt(scoreMatch[2]);
+                                    const pv = pvMatch[1];
+                                    if (depth >= 1 || type === 'mate') {
+                                        let val = 0; let mate = null; const turnMult = game.turn() === 'w' ? 1 : -1;
+                                        if (type === 'mate') { mate = rawScore; val = rawScore > 0 ? 100 : -100; if (game.turn() === 'b') val = -val; } 
+                                        else { val = (rawScore * turnMult) / 100; }
+                                        const formattedPv = formatPvSequence(game.fen(), pv);
+                                        const bestMoveUci = pv.split(' ')[0];
+                                        const bestMoveSan = uciToSan(game.fen(), bestMoveUci);
+                                        setStockfishData({ val, mate, depth, bestMoveSan: toFigurine(bestMoveSan), bestMoveUci, formattedPv });
                                     }
                                 }
-                            };
-                            
-                            worker.postMessage('uci');
-                            worker.postMessage('isready');
-                            stockfishWorker.current = worker;
-                            // Trigger initial analysis
-                            worker.postMessage(`position fen ${currentNode.fen}`);
-                            worker.postMessage('go depth 18');
-                        });
+                            }
+                        };
+                        worker.postMessage('uci');
+                        worker.postMessage('setoption name Hash value 64');
+                        worker.postMessage('setoption name Threads value 4');
+                        worker.postMessage('isready');
+                        stockfishWorker.current = worker;
+                        worker.postMessage(`position fen ${currentNode.fen}`);
+                        worker.postMessage(`go depth ${aiDepth}`);
+                    });
                 } else if (!stockfishEnabled && stockfishWorker.current) {
-                    stockfishWorker.current.terminate();
-                    stockfishWorker.current = null;
-                    setStockfishData(null);
+                    stockfishWorker.current.terminate(); stockfishWorker.current = null; setStockfishData(null);
                 }
-                
-                return () => {
-                   // Cleanup on unmount handled by if-check logic mostly, 
-                   // but good to have a cleanup if strictly unmounting app
-                };
             }, [stockfishEnabled]);
 
-            // Trigger Stockfish Analysis on Move Change
             useEffect(() => {
                 if (stockfishEnabled && stockfishWorker.current) {
-                    setStockfishData(null); // Clear old data
                     stockfishWorker.current.postMessage('stop');
                     stockfishWorker.current.postMessage(`position fen ${currentNode.fen}`);
-                    stockfishWorker.current.postMessage('go depth 18');
+                    stockfishWorker.current.postMessage(`go depth ${aiDepth}`);
                 }
-            }, [currentNode, stockfishEnabled]);
+            }, [currentNode, stockfishEnabled, aiDepth]);
 
-            // --- Lichess Logic ---
+            // --- Lichess ---
             const runLichessEval = useCallback(async (fen) => {
                 if (!lichessEnabled) { setLichessData(null); return; }
                 if (lichessCache.current[fen]) { setLichessData(lichessCache.current[fen]); return; }
-                
                 setIsLichessLoading(true); setLichessData(null);
                 const data = await fetchEvalFromLichess(fen);
-                
                 if (data) {
                     let processedData = data;
                     if (data.pvs && data.pvs.length > 0) {
-                        const pv = data.pvs[0];
-                        const bestMoveUci = pv.moves.split(' ')[0];
-                        const bestMoveSan = uciToSan(fen, bestMoveUci);
+                        const pv = data.pvs[0]; const bestMoveUci = pv.moves.split(' ')[0]; const bestMoveSan = uciToSan(fen, bestMoveUci);
                         const formattedPv = formatPvSequence(fen, pv.moves);
                         processedData = { ...data, bestMoveSan: toFigurine(bestMoveSan), bestMoveUci: bestMoveUci, formattedPv: formattedPv };
                     }
-                    lichessCache.current[fen] = processedData;
-                    setLichessData(processedData);
+                    lichessCache.current[fen] = processedData; setLichessData(processedData);
                 }
                 setIsLichessLoading(false);
             }, [lichessEnabled]);
@@ -513,14 +474,23 @@
                 return () => clearTimeout(lichessTimeoutRef.current);
             }, [currentNode, lichessEnabled, runLichessEval]);
 
-            // --- Auto Eval Logic ---
+            // --- AUTO EVAL UPDATE (Highest Depth Wins) ---
              useEffect(() => {
                 if (!aiAutoEval || currentNode.eval !== null) return;
-                if (stockfishData) { currentNode.aiEval = stockfishData.val; return; }
-                if (lichessData && !stockfishEnabled) { currentNode.aiEval = lichessData.val; }
-            }, [stockfishData, lichessData, aiAutoEval, currentNode, stockfishEnabled]);
+                
+                const bestData = getBestEngineData();
+                if (bestData) {
+                    // Update only if this engine is deeper than what's saved on the node
+                    // (Or if the node has no depth info yet)
+                    const currentSavedDepth = currentNode.aiDepth || 0;
+                    if (bestData.depth >= currentSavedDepth) {
+                         currentNode.aiEval = bestData.val;
+                         currentNode.aiDepth = bestData.depth;
+                    }
+                }
+            }, [stockfishData, lichessData, aiAutoEval, currentNode, getBestEngineData]);
 
-            // --- Keyboard & Navigation ---
+            // ... (Rest of Keyboard, Move Logic same as before)
             useEffect(() => {
                 const handleKeyDown = (e) => {
                     if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
@@ -571,8 +541,11 @@
                 if(field === 'comment') setCommentValue(value);
             };
 
-            const effectiveEval = evalValue !== null ? evalValue : (stockfishData ? stockfishData.val : (lichessData ? lichessData.val : 0.0));
-            const isUsingAiEval = evalValue === null && (stockfishData || lichessData);
+            // DISPLAY EVAL: Use manual, or Best Engine (Max Depth)
+            const bestEngineData = getBestEngineData();
+            const effectiveEval = evalValue !== null ? evalValue : (bestEngineData ? bestEngineData.val : 0.0);
+            const isUsingAiEval = evalValue === null && bestEngineData;
+            
             const showNotification = (msg) => { setNotification(msg); setTimeout(() => setNotification(null), 3000); };
 
             const executeMove = (from, to, promotion = 'q') => {
@@ -699,6 +672,8 @@
                         if(p){ const im=pdfImgs[p===p.toUpperCase()?'w':'b'][p.toLowerCase()]; if(im) doc.addImage(im, 'PNG', px+c*sq+0.5, by+r*sq+0.5, sq-1, sq-1); }
                     }}
                     const barY=by+boardS+1; doc.setDrawColor(150); doc.rect(px, barY, boardS, 2.5);
+                    
+                    // PDF EVAL LOGIC: Prefer manual > aiEval (which is now guaranteed to be max depth)
                     const useEval = node.eval !== null ? node.eval : (node.aiEval !== undefined ? node.aiEval : 0.0);
                     const val = Math.max(-5, Math.min(5, useEval)); 
                     const cw = px+(boardS/2); const fw = (Math.abs(val)/5)*(boardS/2);
@@ -729,7 +704,7 @@
                 setIsGenerating(false);
             };
 
-            const activeBestMoveUci = stockfishData?.bestMoveUci || lichessData?.bestMoveUci;
+            const activeBestMoveUci = bestEngineData?.bestMoveUci;
 
             const renderAiArrow = () => {
                 if (!showAiArrow || !activeBestMoveUci) return null;
@@ -810,18 +785,108 @@
                 );
             };
 
+            const renderTools = () => (
+                <div className="flex flex-col gap-4 h-full p-4 overflow-y-auto">
+                    <div className="hidden lg:flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 text-green-500 font-bold text-xl"><span>♟ Chess Book Pro</span></div>
+                        <button onClick={()=>setShowShortcuts(true)} className="p-1.5 bg-[#302e2b] rounded text-gray-400 hover:text-white border border-[#403d39]" title="Keyboard Shortcuts"><Keyboard size={16}/></button>
+                    </div>
+
+                    <div className="bg-[#302e2b] p-3 rounded-lg flex flex-col gap-2">
+                         <div className="flex justify-between gap-1">
+                            <button onClick={()=>setCurrentNode(rootNode)} className="flex-1 p-2 bg-[#403d39] rounded hover:bg-[#504c47]"><ChevronsLeft size={18}/></button>
+                            <button onClick={()=>{if(currentNode.parent)setCurrentNode(currentNode.parent)}} className="flex-1 p-2 bg-[#403d39] rounded hover:bg-[#504c47]"><ChevronLeft size={18}/></button>
+                            <button onClick={()=>{if(currentNode.children.length)setCurrentNode(currentNode.children[0])}} className="flex-1 p-2 bg-[#403d39] rounded hover:bg-[#504c47]"><ChevronRight size={18}/></button>
+                            <button onClick={()=>{let t=currentNode;while(t.children.length)t=t.children[0];setCurrentNode(t)}} className="flex-1 p-2 bg-[#403d39] rounded hover:bg-[#504c47]"><ChevronsRight size={18}/></button>
+                        </div>
+                        <div className="flex justify-between gap-1 mt-1">
+                            <button onClick={()=>setOrientation(o=>o==='white'?'black':'white')} className="flex-1 p-2 bg-[#403d39] rounded hover:bg-[#504c47] text-gray-300" title="Flip Board"><RotateCcw size={18}/></button>
+                            <button onClick={()=>setShowHighlights(!showHighlights)} className={`flex-1 p-2 rounded hover:bg-[#504c47] ${showHighlights?'bg-green-600/50 text-green-200':'bg-[#403d39] text-gray-400'}`} title="Highlights">{showHighlights?<Eye size={18}/>:<EyeOff size={18}/>}</button>
+                            <button onClick={()=>setShowAiArrow(!showAiArrow)} className={`flex-1 p-2 rounded hover:bg-[#504c47] ${showAiArrow?'bg-blue-600/50 text-blue-200':'bg-[#403d39] text-gray-400'}`} title="AI Arrow"><Navigation size={18}/></button>
+                            <button onClick={deleteCurrentNode} className="flex-1 p-2 bg-[#403d39] text-red-400 rounded hover:bg-[#504c47]" title="Delete Move"><Scissors size={18}/></button>
+                        </div>
+                    </div>
+
+                    <div className="bg-[#302e2b] p-3 rounded-lg flex gap-3 min-h-[180px]">
+                        <div className="w-12 flex flex-col items-center gap-2 h-full relative">
+                            <span className="text-[10px] text-gray-400">EVAL</span>
+                            <div className="relative w-full">
+                                <input type="number" step="0.1" value={evalValue !== null ? evalValue : ''} placeholder={isUsingAiEval ? "AI" : ""} onChange={(e)=>updateNodeData('eval', e.target.value === '' ? null : parseFloat(e.target.value))} className={`w-full bg-[#211f1c] text-center text-xs rounded border border-[#403d39] py-1 ${isUsingAiEval ? 'text-purple-400 border-purple-500/50' : ''}`}/>
+                                {evalValue !== null && <button onClick={() => updateNodeData('eval', null)} className="absolute -right-5 top-0.5 bg-[#403d39] text-[8px] text-gray-300 px-1 rounded hover:bg-gray-600">AI</button>}
+                            </div>
+                            <div className="flex-1 w-full flex justify-center py-1"><input type="range" min="-5" max="5" step="0.1" value={evalValue !== null ? evalValue : 0} onChange={(e)=>updateNodeData('eval',parseFloat(e.target.value))} className="vertical"/></div>
+                            <span className={`text-xs font-mono font-bold ${effectiveEval>0?'text-green-400':effectiveEval<0?'text-red-400':'text-gray-400'}`}>{effectiveEval>0?'+':''}{Number(effectiveEval).toFixed(1)}</span>
+                        </div>
+                        <div className="flex-1 flex flex-col gap-2">
+                            <div className="text-[10px] text-gray-400 flex items-center gap-1"><MessageSquare size={12}/> {currentNode.san === 'Start' ? "METADATA" : "COMMENT"}</div>
+                            <textarea value={commentValue} onChange={(e)=>updateNodeData('comment',e.target.value)} placeholder={currentNode.san === 'Start' ? "Title: My Game..." : "Notes..."} className="w-full h-full bg-[#211f1c] border border-[#403d39] rounded p-2 text-sm text-gray-200 resize-none outline-none focus:border-green-500"/>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <button onClick={copyPGN} className="flex-1 py-2 bg-[#302e2b] rounded text-sm font-bold text-gray-300 flex justify-center gap-2 hover:bg-[#403d39]"><Share size={16}/> PGN</button>
+                        <button onClick={generatePDF} className="flex-1 py-2 bg-green-600 rounded text-sm font-bold text-white flex justify-center gap-2 shadow hover:bg-green-500"><Download size={16}/> PDF</button>
+                    </div>
+                    <button onClick={()=>setShowCollections(true)} className="w-full py-2 bg-[#403d39] rounded text-sm font-bold text-blue-300 flex justify-center gap-2 border border-blue-500/30 hover:bg-[#504c47] hover:border-blue-500"><Folder size={16}/> Collections</button>
+                </div>
+            );
+
+            const renderNotation = () => (
+                <div className="flex flex-col h-full overflow-hidden">
+                   <div className="overflow-y-auto flex-1 p-2">
+                        {activeLine.map((pair, i) => (
+                            <div key={i}>
+                                <div className="main-row">
+                                    <div className="main-num">{pair.num}.</div>
+                                    {pair.white ? <div className={`main-cell ${pair.white.id===currentNode.id?'active-move':'text-gray-300'}`} onClick={()=>setCurrentNode(pair.white)}>{pair.white.san}</div> : <div className="main-cell text-gray-600">...</div>}
+                                    {pair.black ? <div className={`main-cell ${pair.black.id===currentNode.id?'active-move':'text-gray-300'}`} onClick={()=>setCurrentNode(pair.black)}>{pair.black.san}</div> : <div className="main-cell"></div>}
+                                </div>
+                                {pair.whiteVars.map(v=><div key={v.id} className="var-block"><span className="var-text" onClick={()=>setCurrentNode(v)}>({getFullVariationText(v)})</span></div>)}
+                                {pair.blackVars.map(v=><div key={v.id} className="var-block"><span className="var-text" onClick={()=>setCurrentNode(v)}>({getFullVariationText(v)})</span></div>)}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            const renderAI = () => (
+                <div className="p-4 flex flex-col h-full gap-4 overflow-y-auto">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-bold text-gray-200 flex items-center gap-2"><Brain size={16}/> Engines</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-gray-400">Auto</span>
+                            <div className="relative inline-block w-6 align-middle select-none transition duration-200 ease-in">
+                                <input type="checkbox" checked={aiAutoEval} onChange={()=>setAiAutoEval(!aiAutoEval)} className="toggle-checkbox absolute block w-3 h-3 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                <label className={`toggle-label block overflow-hidden h-3 rounded-full cursor-pointer ${aiAutoEval ? 'bg-green-500' : 'bg-gray-600'}`}></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <AiDisplayPanel title="Stockfish 10 (Local)" subTitle="Offline" icon={Cpu} enabled={stockfishEnabled} onToggle={()=>setStockfishEnabled(!stockfishEnabled)} data={stockfishData} loading={stockfishEnabled && !stockfishData} color="purple">
+                        <div className="mb-2">
+                            <div className="flex justify-between text-[10px] text-gray-400 mb-1"><span>Depth</span><span className="text-purple-300 font-bold">{aiDepth}</span></div>
+                            <input type="range" min="10" max="50" step="1" value={aiDepth} onChange={(e)=>setAiDepth(parseInt(e.target.value))} className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"/>
+                            <div className="flex justify-between text-[9px] text-gray-500 mt-1"><span>Fast (10)</span><span>Max (50)</span></div>
+                        </div>
+                    </AiDisplayPanel>
+
+                    <AiDisplayPanel title="Lichess Cloud" subTitle="Online" icon={Globe} enabled={lichessEnabled} onToggle={()=>setLichessEnabled(!lichessEnabled)} data={lichessData} loading={isLichessLoading} color="blue"/>
+                    {!stockfishEnabled && !lichessEnabled && <div className="text-center text-gray-500 text-xs mt-4">Enable an engine above.</div>}
+                </div>
+            );
+
             return (
-                <div className="flex w-screen h-screen bg-[#262421]">
+                <div className="flex flex-col lg:flex-row w-screen h-screen bg-[#262421]">
                     {showShortcuts && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={()=>setShowShortcuts(false)}>
                             <div className="bg-[#302e2b] p-6 rounded-xl border border-[#403d39] w-[400px] shadow-2xl" onClick={e=>e.stopPropagation()}>
                                 <div className="flex justify-between items-center mb-4 border-b border-[#403d39] pb-2">
-                                    <h3 className="text-lg font-bold text-green-500 flex items-center gap-2"><Keyboard size={20}/> Keyboard Shortcuts</h3>
+                                    <h3 className="text-lg font-bold text-green-500 flex items-center gap-2"><Keyboard size={20}/> Shortcuts</h3>
                                     <button onClick={()=>setShowShortcuts(false)} className="text-gray-400 hover:text-white"><Close size={20}/></button>
                                 </div>
                                 <div className="space-y-3 text-sm text-gray-300">
-                                    <div className="flex justify-between"><span className="flex items-center gap-2"><span className="bg-[#403d39] px-2 py-0.5 rounded text-xs">←</span> / <span className="bg-[#403d39] px-2 py-0.5 rounded text-xs">→</span></span> <span>Prev / Next Move</span></div>
-                                    <div className="flex justify-between"><span className="flex items-center gap-2"><span className="bg-[#403d39] px-2 py-0.5 rounded text-xs">↑</span> / <span className="bg-[#403d39] px-2 py-0.5 rounded text-xs">↓</span></span> <span>Start / End Game</span></div>
+                                    <div className="flex justify-between"><span>Next/Prev</span> <span>← / →</span></div>
+                                    <div className="flex justify-between"><span>Start/End</span> <span>↑ / ↓</span></div>
                                 </div>
                             </div>
                         </div>
@@ -829,18 +894,15 @@
 
                     {showCollections && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={()=>setShowCollections(false)}>
-                            <div className="bg-[#211f1c] p-0 rounded-xl border border-[#403d39] w-[500px] shadow-2xl flex flex-col max-h-[80vh]" onClick={e=>e.stopPropagation()}>
+                            <div className="bg-[#211f1c] p-0 rounded-xl border border-[#403d39] w-[90vw] md:w-[500px] shadow-2xl flex flex-col max-h-[80vh]" onClick={e=>e.stopPropagation()}>
                                 <div className="p-4 border-b border-[#302e2b] flex justify-between items-center bg-[#2a2825] rounded-t-xl">
-                                    <h3 className="text-lg font-bold text-gray-200 flex items-center gap-2"><Folder size={18}/> Manage Collections</h3>
+                                    <h3 className="text-lg font-bold text-gray-200 flex items-center gap-2"><Folder size={18}/> Collections</h3>
                                     <button onClick={()=>setShowCollections(false)} className="text-gray-400 hover:text-white"><Close size={20}/></button>
                                 </div>
                                 <div className="p-4 flex gap-2 border-b border-[#302e2b] bg-[#302e2b]">
                                     <button onClick={saveCollection} className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm text-white font-bold flex items-center justify-center gap-1 shadow"><Save size={14}/> Save</button>
-                                    <button onClick={exportCollections} className="flex-1 py-2 bg-[#403d39] hover:bg-[#504c47] rounded text-sm text-gray-200 font-bold flex items-center justify-center gap-1"><Download size={14}/> Export JSON</button>
-                                    <label className="flex-1 py-2 bg-[#403d39] hover:bg-[#504c47] rounded text-sm text-gray-200 font-bold flex items-center justify-center gap-1 cursor-pointer">
-                                        <Upload size={14}/> Import PDF/JSON
-                                        <input type="file" accept=".json,.pdf" className="hidden" onChange={importFile} />
-                                    </label>
+                                    <button onClick={exportCollections} className="flex-1 py-2 bg-[#403d39] hover:bg-[#504c47] rounded text-sm text-gray-200 font-bold flex items-center justify-center gap-1"><Download size={14}/> Export</button>
+                                    <label className="flex-1 py-2 bg-[#403d39] hover:bg-[#504c47] rounded text-sm text-gray-200 font-bold flex items-center justify-center gap-1 cursor-pointer"><Upload size={14}/> Import<input type="file" accept=".json,.pdf" className="hidden" onChange={importFile} /></label>
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#211f1c]">
                                     {savedCollections.map(col => (
@@ -860,134 +922,57 @@
                         </div>
                     )}
 
-                    <div className="w-[300px] bg-[#211f1c] border-r border-[#302e2b] flex flex-col p-4 gap-4 overflow-y-auto z-20 shadow-xl">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2 text-green-500 font-bold text-xl"><span>♟ Chess Book Pro</span></div>
-                            <button onClick={()=>setShowShortcuts(true)} className="p-1.5 bg-[#302e2b] rounded text-gray-400 hover:text-white border border-[#403d39]" title="Keyboard Shortcuts"><Keyboard size={16}/></button>
-                        </div>
-                        
-                        <div className="bg-[#302e2b] p-3 rounded-lg flex flex-col gap-2">
-                            <div className="flex justify-between gap-1">
-                                <button onClick={()=>setCurrentNode(rootNode)} className="flex-1 p-2 bg-[#403d39] rounded hover:bg-[#504c47]"><ChevronsLeft size={18}/></button>
-                                <button onClick={()=>{if(currentNode.parent)setCurrentNode(currentNode.parent)}} className="flex-1 p-2 bg-[#403d39] rounded hover:bg-[#504c47]"><ChevronLeft size={18}/></button>
-                                <button onClick={()=>{if(currentNode.children.length)setCurrentNode(currentNode.children[0])}} className="flex-1 p-2 bg-[#403d39] rounded hover:bg-[#504c47]"><ChevronRight size={18}/></button>
-                                <button onClick={()=>{let t=currentNode;while(t.children.length)t=t.children[0];setCurrentNode(t)}} className="flex-1 p-2 bg-[#403d39] rounded hover:bg-[#504c47]"><ChevronsRight size={18}/></button>
-                            </div>
-                            <div className="flex justify-between gap-1 mt-1">
-                                <button onClick={()=>setOrientation(o=>o==='white'?'black':'white')} className="flex-1 p-2 bg-[#403d39] rounded hover:bg-[#504c47]"><RotateCcw size={18}/></button>
-                                <button onClick={()=>setShowHighlights(!showHighlights)} className={`flex-1 p-2 rounded hover:bg-[#504c47] ${showHighlights?'bg-green-600/50 text-green-200':'bg-[#403d39] text-gray-400'}`}>{showHighlights?<Eye size={18}/>:<EyeOff size={18}/>}</button>
-                                <button onClick={()=>setShowAiArrow(!showAiArrow)} className={`flex-1 p-2 rounded hover:bg-[#504c47] ${showAiArrow?'bg-blue-600/50 text-blue-200':'bg-[#403d39] text-gray-400'}`} title="Toggle AI Arrow"><Navigation size={18}/></button>
-                                <button onClick={deleteCurrentNode} className="flex-1 p-2 bg-[#403d39] text-red-400 rounded hover:bg-[#504c47]"><Scissors size={18}/></button>
-                            </div>
-                        </div>
-
-                        <div className="bg-[#302e2b] p-3 rounded-lg flex gap-3 h-[240px]">
-                            <div className="w-12 flex flex-col items-center gap-2 h-full relative">
-                                <span className="text-[10px] text-gray-400">EVAL</span>
-                                <div className="relative w-full">
-                                    <input type="number" step="0.1" 
-                                        value={evalValue !== null ? evalValue : ''} 
-                                        placeholder={isUsingAiEval ? "AI" : ""}
-                                        onChange={(e)=>updateNodeData('eval', e.target.value === '' ? null : parseFloat(e.target.value))} 
-                                        className={`w-full bg-[#211f1c] text-center text-xs rounded border border-[#403d39] py-1 ${isUsingAiEval ? 'text-purple-400 border-purple-500/50' : ''}`}
-                                    />
-                                    {evalValue !== null && (
-                                        <button onClick={() => updateNodeData('eval', null)} className="absolute -right-5 top-0.5 bg-[#403d39] text-[8px] text-gray-300 px-1 rounded hover:bg-gray-600">AI</button>
-                                    )}
-                                </div>
-                                <div className="flex-1 w-full flex justify-center py-1"><input type="range" min="-5" max="5" step="0.1" value={evalValue !== null ? evalValue : 0} onChange={(e)=>updateNodeData('eval',parseFloat(e.target.value))} className="vertical"/></div>
-                                <span className={`text-xs font-mono font-bold ${effectiveEval>0?'text-green-400':effectiveEval<0?'text-red-400':'text-gray-400'}`}>{effectiveEval>0?'+':''}{Number(effectiveEval).toFixed(1)}</span>
-                            </div>
-                            <div className="flex-1 flex flex-col gap-2">
-                                <div className="text-[10px] text-gray-400 flex items-center gap-1"><MessageSquare size={12}/> {currentNode.san === 'Start' ? "METADATA" : "COMMENT"}</div>
-                                <textarea value={commentValue} onChange={(e)=>updateNodeData('comment',e.target.value)} placeholder={currentNode.san === 'Start' ? "Title: My Game..." : "Notes..."} className="w-full h-full bg-[#211f1c] border border-[#403d39] rounded p-2 text-sm text-gray-200 resize-none outline-none focus:border-green-500"/>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                            <button onClick={copyPGN} className="flex-1 py-2 bg-[#302e2b] rounded text-sm font-bold text-gray-300 flex justify-center gap-2 hover:bg-[#403d39]"><Share size={16}/> PGN</button>
-                            <button onClick={generatePDF} className="flex-1 py-2 bg-green-600 rounded text-sm font-bold text-white flex justify-center gap-2 shadow hover:bg-green-500"><Download size={16}/> PDF</button>
-                        </div>
-                        <button onClick={()=>setShowCollections(true)} className="w-full py-2 bg-[#403d39] rounded text-sm font-bold text-blue-300 flex justify-center gap-2 border border-blue-500/30 hover:bg-[#504c47] hover:border-blue-500"><Folder size={16}/> Collections & Saves</button>
+                    <div className="hidden lg:flex w-[300px] bg-[#211f1c] border-r border-[#302e2b] flex-col z-20 shadow-xl">
+                        {renderTools()}
                     </div>
 
-                    <div className="flex-1 flex justify-center items-center bg-[#302e2b] p-4 relative">
-                        {notification && <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded shadow-lg z-50 text-sm animate-fade-in">{notification}</div>}
+                    <div className="flex-1 flex flex-col items-center bg-[#302e2b] relative overflow-hidden">
+                        <div className="lg:hidden w-full bg-[#211f1c] p-2 flex justify-between items-center border-b border-[#302e2b]">
+                            <span className="text-green-500 font-bold text-lg">♟ Chess Book</span>
+                            <button onClick={()=>setShowShortcuts(true)} className="p-1 text-gray-400"><Keyboard size={20}/></button>
+                        </div>
+
+                        {notification && <div className="absolute top-14 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded shadow-lg z-50 text-sm animate-fade-in">{notification}</div>}
                         {gameStatus && (
-                            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl z-30 bg-gray-800/95 text-white border border-gray-600 backdrop-blur-sm text-center">
+                            <div className="absolute top-16 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl z-30 bg-gray-800/95 text-white border border-gray-600 backdrop-blur-sm text-center">
                                 <div className="font-bold text-lg mb-1 text-green-400">{gameStatus.title}</div>
                                 {gameStatus.sub && <div className="text-sm text-gray-300 mb-1">{gameStatus.sub}</div>}
                             </div>
                         )}
-                        <div className="w-full h-full max-w-[90vh] max-h-[90vh] aspect-square shadow-2xl border-[8px] border-[#211f1c] grid grid-cols-8 grid-rows-8 relative">
-                            {renderBoard()}
-                            <PromotionModal />
+
+                        <div className="w-full flex-1 flex flex-col justify-center items-center p-2 lg:p-4">
+                             <div className="w-full max-w-[600px] aspect-square shadow-2xl border-[4px] lg:border-[8px] border-[#211f1c] grid grid-cols-8 grid-rows-8 relative">
+                                {renderBoard()}
+                                <PromotionModal />
+                            </div>
+                            
+                            <div className="lg:hidden w-full max-w-[600px] flex justify-between gap-1 mt-2">
+                                <button onClick={()=>{if(currentNode.parent)setCurrentNode(currentNode.parent)}} className="flex-1 p-3 bg-[#403d39] rounded text-white flex justify-center"><ChevronLeft size={24}/></button>
+                                <button onClick={()=>{if(currentNode.children.length)setCurrentNode(currentNode.children[0])}} className="flex-1 p-3 bg-[#403d39] rounded text-white flex justify-center"><ChevronRight size={24}/></button>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="w-[300px] bg-[#211f1c] border-l border-[#302e2b] flex flex-col relative">
+                    <div className="hidden lg:flex w-[300px] bg-[#211f1c] border-l border-[#302e2b] flex-col relative">
                         <div className="flex border-b border-[#302e2b]">
                             <button onClick={()=>setActiveTab('notation')} className={`flex-1 p-3 text-xs font-bold ${activeTab==='notation'?'text-green-500 border-b-2 border-green-500':'text-gray-400 hover:bg-[#302e2b]'}`}>Notation</button>
-                            <button onClick={()=>setActiveTab('ai')} className={`flex-1 p-3 text-xs font-bold ${activeTab==='ai'?'text-purple-500 border-b-2 border-purple-500':'text-gray-400 hover:bg-[#302e2b]'}`}>AI Analysis</button>
+                            <button onClick={()=>setActiveTab('ai')} className={`flex-1 p-3 text-xs font-bold ${activeTab==='ai'?'text-purple-500 border-b-2 border-purple-500':'text-gray-400 hover:bg-[#302e2b]'}`}>AI</button>
                         </div>
-
                         <div className="flex-1 overflow-y-auto">
-                            {activeTab === 'notation' && (
-                                <div>{activeLine.map((pair, i) => (
-                                    <div key={i}>
-                                        <div className="main-row">
-                                            <div className="main-num">{pair.num}.</div>
-                                            {pair.white ? <div className={`main-cell ${pair.white.id===currentNode.id?'active-move':'text-gray-300'}`} onClick={()=>setCurrentNode(pair.white)}>{pair.white.san}</div> : <div className="main-cell text-gray-600">...</div>}
-                                            {pair.black ? <div className={`main-cell ${pair.black.id===currentNode.id?'active-move':'text-gray-300'}`} onClick={()=>setCurrentNode(pair.black)}>{pair.black.san}</div> : <div className="main-cell"></div>}
-                                        </div>
-                                        {pair.whiteVars.map(v=><div key={v.id} className="var-block"><span className="var-text" onClick={()=>setCurrentNode(v)}>({getFullVariationText(v)})</span></div>)}
-                                        {pair.blackVars.map(v=><div key={v.id} className="var-block"><span className="var-text" onClick={()=>setCurrentNode(v)}>({getFullVariationText(v)})</span></div>)}
-                                    </div>
-                                ))}</div>
-                            )}
+                            {activeTab === 'notation' ? renderNotation() : renderAI()}
+                        </div>
+                    </div>
 
-                            {activeTab === 'ai' && (
-                                <div className="p-4 flex flex-col h-full gap-4">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-sm font-bold text-gray-200 flex items-center gap-2"><Brain size={16}/> Engines</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] text-gray-400">Auto-Apply</span>
-                                            <div className="relative inline-block w-6 align-middle select-none transition duration-200 ease-in">
-                                                <input type="checkbox" checked={aiAutoEval} onChange={()=>setAiAutoEval(!aiAutoEval)} className="toggle-checkbox absolute block w-3 h-3 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
-                                                <label className={`toggle-label block overflow-hidden h-3 rounded-full cursor-pointer ${aiAutoEval ? 'bg-green-500' : 'bg-gray-600'}`}></label>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <AiDisplayPanel 
-                                        title="Stockfish 10 (Browser)" 
-                                        subTitle="Runs offline in browser"
-                                        icon={Cpu}
-                                        enabled={stockfishEnabled}
-                                        onToggle={()=>setStockfishEnabled(!stockfishEnabled)}
-                                        data={stockfishData}
-                                        loading={stockfishEnabled && !stockfishData}
-                                        color="purple"
-                                    >
-                                        <div className="text-[10px] text-gray-500 mb-2 italic">
-                                            *รันบนเครื่องของคุณเอง ไม่ต้องต่อเน็ต
-                                        </div>
-                                    </AiDisplayPanel>
-
-                                    <AiDisplayPanel 
-                                        title="Lichess Cloud" 
-                                        subTitle="Online database"
-                                        icon={Globe}
-                                        enabled={lichessEnabled}
-                                        onToggle={()=>setLichessEnabled(!lichessEnabled)}
-                                        data={lichessData}
-                                        loading={isLichessLoading}
-                                        color="blue"
-                                    />
-                                    
-                                    {!stockfishEnabled && !lichessEnabled && <div className="text-center text-gray-500 text-xs mt-4">Enable an engine above to start analysis.</div>}
-                                </div>
-                            )}
+                    <div className="lg:hidden h-[35vh] bg-[#211f1c] border-t border-[#302e2b] flex flex-col">
+                        <div className="flex border-b border-[#302e2b] bg-[#2a2825]">
+                            <button onClick={()=>setMobileTab('tools')} className={`flex-1 py-3 text-xs font-bold flex justify-center items-center gap-2 ${mobileTab==='tools'?'mobile-tab-active':'mobile-tab-inactive'}`}><Wrench size={14}/> Tools</button>
+                            <button onClick={()=>setMobileTab('notation')} className={`flex-1 py-3 text-xs font-bold flex justify-center items-center gap-2 ${mobileTab==='notation'?'mobile-tab-active':'mobile-tab-inactive'}`}><FileText size={14}/> Notation</button>
+                            <button onClick={()=>setMobileTab('ai')} className={`flex-1 py-3 text-xs font-bold flex justify-center items-center gap-2 ${mobileTab==='ai'?'mobile-tab-active':'mobile-tab-inactive'}`}><Brain size={14}/> AI</button>
+                        </div>
+                        <div className="flex-1 overflow-hidden relative">
+                            {mobileTab === 'tools' && renderTools()}
+                            {mobileTab === 'notation' && renderNotation()}
+                            {mobileTab === 'ai' && renderAI()}
                         </div>
                     </div>
                 </div>
