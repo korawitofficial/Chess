@@ -87,11 +87,12 @@
             Keyboard: (p) => <Icon {...p} path={<><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><line x1="6" y1="8" x2="6" y2="8"></line><line x1="10" y1="8" x2="10" y2="8"></line><line x1="14" y1="8" x2="14" y2="8"></line><line x1="18" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="6" y2="12"></line><line x1="10" y1="12" x2="10" y2="12"></line><line x1="14" y1="12" x2="14" y2="12"></line><line x1="18" y1="12" x2="18" y2="12"></line><line x1="6" y1="16" x2="6" y2="16"></line><line x1="10" y1="16" x2="16" y2="16"></line></>} />,
             Close: (p) => <Icon {...p} path={<><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></>} />,
             Server: (p) => <Icon {...p} path={<><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></>} />,
-            Globe: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></>} />,
+            Globe: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/></>} />,
             Cpu: (p) => <Icon {...p} path={<><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></>} />,
-            Wrench: (p) => <Icon {...p} path={<><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>} />
+            Wrench: (p) => <Icon {...p} path={<><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>} />,
+            Zap: (p) => <Icon {...p} path={<><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></>} />
         };
-        const { FileText, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Share, Trash, MessageSquare, Save, Folder, Scissors, Eye, EyeOff, Upload, ExternalLink, Brain, Navigation, Keyboard, Close, Server, Globe, Cpu, Wrench } = Icons;
+        const { FileText, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download, Share, Trash, MessageSquare, Save, Folder, Scissors, Eye, EyeOff, Upload, ExternalLink, Brain, Navigation, Keyboard, Close, Server, Globe, Cpu, Wrench, Zap } = Icons;
 
         const PIECE_IMAGES = {
             'w': { 'p': 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg', 'n': 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg', 'b': 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg', 'r': 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg', 'q': 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg', 'k': 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg' },
@@ -355,6 +356,7 @@
             const [showCollections, setShowCollections] = useState(false);
             const [isGenerating, setIsGenerating] = useState(false);
             const [mobileTab, setMobileTab] = useState('tools');
+            const [analysisStatus, setAnalysisStatus] = useState({ isAnalyzing: false, progress: 0, total: 0, completed: 0 });
             
             // AI States
             const [lichessEnabled, setLichessEnabled] = useState(false);
@@ -581,7 +583,11 @@
                     if (possibleMoves.includes(sq)) { executeMove(selectedSquare, sq); return; }
                 }
                 const p = game.get(sq);
-                if (p && p.color === game.turn()) { setSelectedSquare(sq); if(showHighlights) setPossibleMoves(game.moves({ square: sq, verbose: true }).map(m => m.to)); } 
+                if (p && p.color === game.turn()) { 
+                    setSelectedSquare(sq); 
+                    // FIX: Always calculate moves, but render conditionally
+                    setPossibleMoves(game.moves({ square: sq, verbose: true }).map(m => m.to)); 
+                } 
                 else { setSelectedSquare(null); setPossibleMoves([]); }
             };
 
@@ -648,6 +654,61 @@
 
             const copyPGN = () => { navigator.clipboard.writeText(generateTreePGN(rootNode)).then(()=>showNotification("PGN Copied")); };
             
+            // --- NEW FUNCTION: RECURSIVE NODE COLLECTION ---
+            const getAllNodes = (node) => {
+                let nodes = [node];
+                node.children.forEach(c => nodes = nodes.concat(getAllNodes(c)));
+                return nodes;
+            };
+
+            // --- NEW FUNCTION: AUTO ANALYZE MISSING EVALS ---
+            const autoAnalyzeMissingEvals = async () => {
+                const allNodes = getAllNodes(rootNode);
+                // Filter nodes that need analysis: Not Start, No Manual Eval, No AI Eval
+                const missingNodes = allNodes.filter(n => n.san !== 'Start' && n.eval === null && (n.aiEval === null || n.aiEval === undefined));
+                
+                if (missingNodes.length === 0) return true;
+
+                setAnalysisStatus({ isAnalyzing: true, progress: 0, total: missingNodes.length, completed: 0 });
+
+                // Process in chunks to allow UI updates
+                for (let i = 0; i < missingNodes.length; i++) {
+                    const node = missingNodes[i];
+                    try {
+                        const data = await fetchEvalFromLichess(node.fen);
+                        if (data && data.val !== undefined) {
+                             node.aiEval = data.val;
+                             node.aiDepth = data.depth || 0;
+                        }
+                    } catch(e) { console.error("Lichess Eval Error:", e); }
+
+                    setAnalysisStatus(prev => ({
+                        ...prev,
+                        completed: i + 1,
+                        progress: Math.round(((i + 1) / missingNodes.length) * 100)
+                    }));
+                    
+                    // Delay to avoid rate limiting (Lichess Cloud Eval)
+                    await new Promise(r => setTimeout(r, 400));
+                }
+                
+                setAnalysisStatus({ isAnalyzing: false, progress: 0, total: 0, completed: 0 });
+                // Force update UI to show new evals
+                setCurrentNode(prev => Object.assign(Object.create(Object.getPrototypeOf(prev)), prev));
+                return true;
+            };
+
+            const handleAutoAnalyzeClick = async () => {
+                await autoAnalyzeMissingEvals();
+                showNotification("วิเคราะห์ข้อมูลครบถ้วนแล้ว!");
+            };
+
+            const handleGeneratePDF = async () => {
+                // Check and analyze first
+                await autoAnalyzeMissingEvals();
+                generatePDF();
+            };
+
             const generatePDF = async () => {
                 const meta = parseMetadata(rootNode.comment);
                 setIsGenerating(true); showNotification("Generating Smart PDF...");
@@ -671,6 +732,46 @@
                         const p=board[r][c];
                         if(p){ const im=pdfImgs[p===p.toUpperCase()?'w':'b'][p.toLowerCase()]; if(im) doc.addImage(im, 'PNG', px+c*sq+0.5, by+r*sq+0.5, sq-1, sq-1); }
                     }}
+
+                    // --- DRAW ARROW FUNCTION START ---
+                    if (node && node.parent) {
+                        try {
+                            const tempC = new Chess(node.parent.fen);
+                            const mv = tempC.move(node.san);
+                            if (mv) {
+                                const cols = {a:0,b:1,c:2,d:3,e:4,f:5,g:6,h:7};
+                                const fromC = cols[mv.from[0]];
+                                const fromR = 8 - parseInt(mv.from[1]);
+                                const toC = cols[mv.to[0]];
+                                const toR = 8 - parseInt(mv.to[1]);
+                                
+                                const x1 = px + fromC*sq + sq/2;
+                                const y1 = by + fromR*sq + sq/2;
+                                const x2 = px + toC*sq + sq/2;
+                                const y2 = by + toR*sq + sq/2;
+
+                                doc.setDrawColor(0); 
+                                doc.setFillColor(0);
+                                doc.setLineWidth(0.3); // Thin line
+
+                                // Draw line
+                                doc.line(x1, y1, x2, y2);
+
+                                // Arrow Head
+                                const angle = Math.atan2(y2-y1, x2-x1);
+                                const headSize = 2; // size in units
+                                
+                                doc.triangle(
+                                    x2, y2,
+                                    x2 - headSize * Math.cos(angle - Math.PI/6), y2 - headSize * Math.sin(angle - Math.PI/6),
+                                    x2 - headSize * Math.cos(angle + Math.PI/6), y2 - headSize * Math.sin(angle + Math.PI/6),
+                                    'F' // Filled
+                                );
+                            }
+                        } catch(e) {}
+                    }
+                    // --- DRAW ARROW FUNCTION END ---
+
                     const barY=by+boardS+1; doc.setDrawColor(150); doc.rect(px, barY, boardS, 2.5);
                     
                     // PDF EVAL LOGIC: Prefer manual > aiEval (which is now guaranteed to be max depth)
@@ -736,8 +837,12 @@
                 for(let r=0;r<8;r++){ for(let c=0;c<8;c++){
                     const ar=orientation==='white'?r:7-r, ac=orientation==='white'?c:7-c;
                     const s=String.fromCharCode(97+ac)+(8-ar); const isLight=(ar+ac)%2===0; const p=b[ar][ac];
-                    const isSel=selectedSquare===s; const isPoss=possibleMoves.includes(s); const isMov=movablePieces.includes(s);
-                    sqs.push(<div key={`${r}-${c}`} onClick={()=>handleSquareClick(ar,ac)} className={`w-full h-full flex justify-center items-center relative cursor-pointer ${isLight?'bg-[#ebecd0]':'bg-[#739552]'} ${isSel?'!bg-[#f7f769]':''}`}>
+                    
+                    const isSel=selectedSquare===s; 
+                    const isPoss=showHighlights && possibleMoves.includes(s); 
+                    const isMov=movablePieces.includes(s);
+                    
+                    sqs.push(<div key={`${r}-${c}`} onClick={()=>handleSquareClick(r,c)} className={`w-full h-full flex justify-center items-center relative cursor-pointer ${isLight?'bg-[#ebecd0]':'bg-[#739552]'} ${isSel?'!bg-[#f7f769]':''}`}>
                         {ac===(orientation==='white'?0:7) && <span className={`absolute top-0.5 left-0.5 text-[10px] font-bold ${isLight?'text-[#739552]':'text-[#ebecd0]'}`}>{8-ar}</span>}
                         {ar===(orientation==='white'?7:0) && <span className={`absolute bottom-0 right-1 text-[10px] font-bold ${isLight?'text-[#739552]':'text-[#ebecd0]'}`}>{String.fromCharCode(97+ac)}</span>}
                         {isMov && !isSel && <div className="absolute w-full h-full border-[3px] border-blue-400/70 rounded-lg z-0"></div>}
@@ -785,6 +890,24 @@
                 );
             };
 
+            // --- PROGRESS OVERLAY ---
+            const AnalyzeOverlay = () => {
+                if (!analysisStatus.isAnalyzing) return null;
+                return (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                        <div className="bg-[#302e2b] p-8 rounded-xl border border-[#403d39] shadow-2xl flex flex-col items-center gap-4 max-w-sm w-full animate-fade-in">
+                            <div className="spinner w-12 h-12 border-4 border-l-blue-500"></div>
+                            <h3 className="text-xl font-bold text-blue-400">กำลังวิเคราะห์ข้อมูล...</h3>
+                            <div className="w-full bg-gray-700 rounded-full h-2.5">
+                                <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${analysisStatus.progress}%` }}></div>
+                            </div>
+                            <div className="text-sm text-gray-300">{analysisStatus.completed} / {analysisStatus.total} ตาเดิน ({analysisStatus.progress}%)</div>
+                            <p className="text-xs text-gray-500 text-center">กำลังดึงคะแนนประเมินจาก Lichess Cloud<br/>กรุณารอสักครู่...</p>
+                        </div>
+                    </div>
+                );
+            };
+
             const renderTools = () => (
                 <div className="flex flex-col gap-4 h-full p-4 overflow-y-auto">
                     <div className="hidden lg:flex items-center justify-between mb-2">
@@ -823,9 +946,15 @@
                         </div>
                     </div>
 
+                     <div className="bg-[#302e2b] p-2 rounded-lg">
+                        <button onClick={handleAutoAnalyzeClick} className="w-full py-2 bg-purple-600/20 text-purple-300 border border-purple-500/50 rounded text-sm font-bold flex justify-center items-center gap-2 hover:bg-purple-600/30 transition-colors">
+                            <Zap size={16} /> เติม Eval อัตโนมัติ (Auto-Fill)
+                        </button>
+                    </div>
+
                     <div className="flex gap-2">
                         <button onClick={copyPGN} className="flex-1 py-2 bg-[#302e2b] rounded text-sm font-bold text-gray-300 flex justify-center gap-2 hover:bg-[#403d39]"><Share size={16}/> PGN</button>
-                        <button onClick={generatePDF} className="flex-1 py-2 bg-green-600 rounded text-sm font-bold text-white flex justify-center gap-2 shadow hover:bg-green-500"><Download size={16}/> PDF</button>
+                        <button onClick={handleGeneratePDF} className="flex-1 py-2 bg-green-600 rounded text-sm font-bold text-white flex justify-center gap-2 shadow hover:bg-green-500"><Download size={16}/> PDF</button>
                     </div>
                     <button onClick={()=>setShowCollections(true)} className="w-full py-2 bg-[#403d39] rounded text-sm font-bold text-blue-300 flex justify-center gap-2 border border-blue-500/30 hover:bg-[#504c47] hover:border-blue-500"><Folder size={16}/> Collections</button>
                 </div>
@@ -862,6 +991,10 @@
                         </div>
                     </div>
 
+                     <button onClick={handleAutoAnalyzeClick} className="w-full py-2 mb-2 bg-purple-600 text-white rounded text-sm font-bold flex justify-center items-center gap-2 hover:bg-purple-500 shadow-lg">
+                        <Zap size={16} /> เติม Eval อัตโนมัติ (Auto-Fill)
+                    </button>
+
                     <AiDisplayPanel title="Stockfish 10 (Local)" subTitle="Offline" icon={Cpu} enabled={stockfishEnabled} onToggle={()=>setStockfishEnabled(!stockfishEnabled)} data={stockfishData} loading={stockfishEnabled && !stockfishData} color="purple">
                         <div className="mb-2">
                             <div className="flex justify-between text-[10px] text-gray-400 mb-1"><span>Depth</span><span className="text-purple-300 font-bold">{aiDepth}</span></div>
@@ -877,6 +1010,8 @@
 
             return (
                 <div className="flex flex-col lg:flex-row w-screen h-screen bg-[#262421]">
+                    <AnalyzeOverlay />
+                    
                     {showShortcuts && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={()=>setShowShortcuts(false)}>
                             <div className="bg-[#302e2b] p-6 rounded-xl border border-[#403d39] w-[400px] shadow-2xl" onClick={e=>e.stopPropagation()}>
